@@ -1,0 +1,60 @@
+{
+    	/*
+		Formatting options
+	*/
+	// It's often more practical to allow them
+	"json.schemas": [
+		{
+			"fileMatch": ["*.code-workspace*"],
+			"schema": {
+				"allowTrailingCommas": true,
+			},
+		},
+	],
+	"files.insertFinalNewline": true,
+	"editor.rulers": [120],
+	"editor.formatOnSave": true,
+	"editor.detectIndentation": false,
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4,
+	"prettier.tabWidth": 4,
+	"prettier.trailingComma": "all",
+	"prettier.useTabs": true,
+	"[python]": {
+		"editor.defaultFormatter": "charliermarsh.ruff",
+	},
+	"[json]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+	},
+    
+    // Ruff formatting options (https://docs.astral.sh/ruff/settings/)
+	"ruff.configurationPreference": "editorOnly",
+	"ruff.format.preview": false,
+	"ruff.format.backend": "internal",
+	"ruff.configuration": {
+		"indent-width": 4,
+		"line-length": 120,
+		"lint": {
+			"preview": false,
+			"ignore": ["E401"],
+			"pycodestyle": {
+				"max-line-length": 120,
+			},
+		},
+		"format": {
+			"docstring-code-format": true,
+			"indent-style": "tab",
+			"line-ending": "native",
+			"preview": false,
+			"quote-style": "double",
+			"skip-magic-trailing-comma": false,
+		},
+	},
+	"editor.codeActionsOnSave": {
+		"source.organizeImports.ruff": "explicit",
+		"source.fixAll.ruff": "explicit",
+	},
+}
