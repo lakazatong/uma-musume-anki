@@ -27,14 +27,13 @@ def crop_transparent(src, dst):
 
 
 def main():
-
 	with open("characters.json", encoding="utf8") as f:
 		characters = json.load(f)
 
 	with open("teams.json", encoding="utf8") as f:
 		teams = json.load(f)
 
-	deck = UmaDeck()
+	deck = UmaDeck(teams)
 
 	media_dir = ".anki_cropped_outfits"
 	os.makedirs(media_dir, exist_ok=True)
@@ -53,7 +52,6 @@ def main():
 			src = os.path.abspath(os.path.join(folder, file))
 
 			dst_name = f"{name.replace(' ', '_')}_{file}"
-
 			dst = os.path.join(media_dir, dst_name)
 
 			if not os.path.exists(dst):
@@ -62,7 +60,7 @@ def main():
 			media.append(dst)
 
 		character = characters[name]
-		deck.add_character(name, character, teams)
+		deck.add_character(name, character)
 
 	package = genanki.Package(deck)
 	package.media_files = media

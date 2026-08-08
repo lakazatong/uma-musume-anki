@@ -5,7 +5,8 @@ import path from "path";
 const BASE_URL = "https://umamusu.wiki";
 
 const teamsScript = await fs.readFile("./scrap_teams.js", "utf8");
-const characterScript = await fs.readFile("./scrap_character.js", "utf8");
+const charactersScript = await fs.readFile("./scrap_characters.js", "utf8");
+const outfitScript = await fs.readFile("./scrap_outfit.js", "utf8");
 
 const browser = await chromium.launch({
 	headless: false,
@@ -22,23 +23,54 @@ async function scrapTeams() {
 	}, teamsScript);
 }
 
-async function scrapCharacter(href) {
-	await page.goto(href);
+async function scrapCharacters() {
+	await page.goto(`${BASE_URL}/List_of_Characters`);
+
+	return page.evaluate((script) => {
+		eval(script);
+		return scrapCharacters();
+	}, charactersScript);
+}
+
+async function scrapCharacter(url) {
+	await page.goto(`${url}/edit`);
 
 	return page.evaluate((script) => {
 		eval(script);
 		return scrapCharacter();
-	}, characterScript);
+	}, charactersScript);
 }
 
-async function downloadOutfits(name, outfits) {
-	const folder = path.join("outfits", name);
+async function scrapOutfit(url) {
+	await page.goto(url);
 
+	return page.evaluate((script) => {
+		eval(script);
+		return scrapOutfit();
+	}, outfitScript);
+}
+
+async function downloadOutfits(name, data) {
+	const folder = path.join("outfits", name);
 	await fs.mkdir(folder, { recursive: true });
 
-	for (const outfit of outfits) {
-		const ext = path.extname(new URL(outfit.url).pathname);
-		const filename = `${outfit.name}${ext}`;
+	const outfits = ["main", "race", "proto", "stage"].filter(
+		(outfit_name) => data[`image_${outfit_name}`],
+	);
+
+	const files = await fs.readdir(folder);
+
+	// avoid unnecessary navigation
+	if (outfits.every((outfit_name) => files.some((file) => file.startsWith(`${outfit_name}.`))))
+		return;
+
+	for (const outfit_name of outfits) {
+		const outfit_file = data[`image_${outfit_name}`];
+		const file_url = `${BASE_URL}/File:${outfit_file.replaceAll(" ", "_")}`;
+
+		const image_url = await scrapOutfit(file_url);
+		const ext = path.extname(new URL(image_url).pathname);
+		const filename = `${outfit_name}${ext}`;
 		const filepath = path.join(folder, filename);
 
 		try {
@@ -46,9 +78,15 @@ async function downloadOutfits(name, outfits) {
 			continue;
 		} catch {}
 
-		const response = await fetch(outfit.url);
-		const buffer = Buffer.from(await response.arrayBuffer());
+		const response = await fetch(image_url);
 
+		if (!response.ok) {
+			throw new Error(
+				`Failed to download ${image_url}: ${response.status} ${response.statusText}`,
+			);
+		}
+
+		const buffer = Buffer.from(await response.arrayBuffer());
 		await fs.writeFile(filepath, buffer);
 	}
 }
@@ -56,42 +94,60 @@ async function downloadOutfits(name, outfits) {
 // start
 
 const teams = await scrapTeams();
+const characters = await scrapCharacters();
 
-const characters = new Map();
+const characterTeams = new Map();
 
-for (const team of teams) {
+for (const [teamName, team] of Object.entries(teams)) {
+	const newMembers = [];
 	for (const member of team.members) {
-		// trust href more than names for duplicates
-		characters.set(member.href, member);
+		const teamNames = characterTeams.get(member.name) ?? [];
+		teamNames.push(teamName);
+		characterTeams.set(member.name, teamNames);
+		newMembers.push({
+			name: member.name,
+			...(member.role ? { role: member.role } : {}),
+		});
 	}
+	team.members = newMembers;
 }
 
-const characterData = {};
+let characterData = {};
 
-const gameIds = JSON.parse(fs.readFileSync("game_ids.json", "utf-8"));
-
-for (const { name, href } of characters.values()) {
-	console.log(`Scrapping ${name}`);
-	const data = await scrapCharacter(href);
-	data.url = href;
-	if (characterData[name]) {
-		// we thus have to make sure there are no duplicate name with different urls
-		throw new Error(`Duplicate character name: ${name}`);
+try {
+	characterData = JSON.parse(await fs.readFile("characters.json", "utf8"));
+} catch (error) {
+	if (error.code !== "ENOENT") {
+		throw error;
 	}
-	if (gameIds[name] !== undefined) {
-		data.game_id = gameIds[name];
-	}
-	characterData[name] = data;
-	await downloadOutfits(name, data.outfits);
 }
+let i = 0;
+let n = 10;
 
-for (const team of teams) {
-	// keep only name to find it inside characters.json
-	// and role because it's unique to the team
-	team.members = team.members.map(({ name, role }) => ({
-		name,
-		...(role ? { role } : {}),
-	}));
+for (const category of characters) {
+	for (const { name, url } of category.characters) {
+		if (characterData[name]) continue;
+		if (i >= n) break;
+		i++;
+
+		console.log(`Scrapping ${name}`);
+
+		const data = await scrapCharacter(url);
+		data.url = url;
+
+		if (characterData[name]) {
+			throw new Error(`Duplicate character name: ${name}`);
+		}
+
+		const teams = characterTeams.get(name);
+		if (teams) {
+			data.teams = teams;
+		}
+
+		characterData[name] = data;
+
+		await downloadOutfits(name, data);
+	}
 }
 
 await fs.writeFile("characters.json", JSON.stringify(characterData, null, 4), "utf8");

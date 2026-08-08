@@ -142,6 +142,7 @@ html, body {
 .back-right {
     flex: 1 1 320px;
     min-width: 0;
+    text-align: center;
 }
 
 .back-left .stage {
@@ -158,11 +159,19 @@ html, body {
 
 table.infobox {
     border-collapse: collapse;
+    margin: 0 auto;
+    text-align: left;
 }
 
 table.infobox td {
     font-size: 24px;
     padding: 6px 20px 6px 0;
+    vertical-align: top;
+}
+
+table.infobox ul {
+    margin: 0;
+    padding-left: 24px;
 }
 
 a {

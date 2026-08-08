@@ -177,23 +177,31 @@ function scrapTeams() {
 	tree.children.forEach(passTeams);
 	tree.children.forEach(passCategories);
 
-	return tree.children.flatMap((category) =>
-		category.teams.map(({ label, members = [], singles = [], notes = "", ...team }) => ({
-			...team,
-			name: label.replace("(DLC)", " (DLC)"),
-			origin: category.label,
-			notes,
-			members: [
-				...members.map(({ title, ...member }) => ({
-					...member,
-					name: normalizeName(title),
-				})),
-				...singles.map(({ label, title, ...single }) => ({
-					...single,
-					name: normalizeName(title),
-					role: label,
-				})),
-			],
-		})),
+	return Object.fromEntries(
+		tree.children.flatMap((category) =>
+			category.teams.map(({ label, members = [], singles = [], notes = "", ...team }) => {
+				const name = label.replace("(DLC)", " (DLC)");
+
+				return [
+					name,
+					{
+						...team,
+						origin: category.label,
+						notes,
+						members: [
+							...members.map(({ title, ...member }) => ({
+								...member,
+								name: normalizeName(title),
+							})),
+							...singles.map(({ label, title, ...single }) => ({
+								...single,
+								name: normalizeName(title),
+								role: label,
+							})),
+						],
+					},
+				];
+			}),
+		),
 	);
 }

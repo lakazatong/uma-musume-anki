@@ -1,145 +1,180 @@
 import os
 import random
-from urllib.parse import urlparse
+from typing import cast
 
 import genanki
 
 from anki_model import model
-from utils import file_page, link_wrap, wiki_page
+from utils import dorm_page, file_page, link_wrap, wiki_page
 
 
 class StableNote(genanki.Note):
 	@property
 	def guid(self):
-		return genanki.guid_for("umamusume", self.fields[0])
+		fields = cast(list[str], self.fields)
+		return genanki.guid_for("umamusume", fields[0])
+
+	@guid.setter
+	def guid(self, val):
+		self._guid = val
 
 
 class UmaDeck(genanki.Deck):
-	def __init__(self):
+	def __init__(self, teams):
 		random.seed("Umamusume Characters")
+		super().__init__(
+			random.randrange(1 << 30, 1 << 31),
+			"Umamusume Characters",
+		)
+		self.teams = teams
 
-		super().__init__(random.randrange(1 << 30, 1 << 31), "Umamusume Characters")
-
-	def add_character(self, name, character, teams):
+	def get_images(self, name, character):
 		folder = os.path.join("outfits", name)
-
 		if not os.path.isdir(folder):
-			return
+			raise FileNotFoundError("Missing", folder)
 
-		outfits = character["outfits"]
-
-		expected = {x["name"]: x for x in outfits}
+		outfit_fields = {
+			"main": character.get("image_main"),
+			"race": character.get("image_race"),
+			"proto": character.get("image_proto"),
+			"stage": character.get("image_stage"),
+		}
+		outfit_fields = {name: value for name, value in outfit_fields.items() if value}
 
 		images = [x for x in os.listdir(folder) if x.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]
-		for image in images:
-			outfit_name = os.path.splitext(image)[0]
 
-			if outfit_name not in expected:
-				raise RuntimeError(f"Unexpected outfit file for {name}: {image}")
+		expected = set(outfit_fields)
+		actual = {os.path.splitext(x)[0].lower() for x in images}
 
-		if set(expected) != {os.path.splitext(x)[0] for x in images}:
-			missing = set(expected) - {os.path.splitext(x)[0] for x in images}
-			raise RuntimeError(f"Missing outfits for {name}: {', '.join(missing)}")
+		if actual != expected:
+			missing = expected - actual
+			unexpected = actual - expected
 
-		images.sort()
+			if missing:
+				raise RuntimeError(f"Missing outfits for {name}: {', '.join(sorted(missing))}")
 
-		if "Main.png" in images:
-			images.remove("Main.png")
-			images.insert(0, "Main.png")
+			if unexpected:
+				raise RuntimeError(f"Unexpected outfit files for {name}: {', '.join(sorted(unexpected))}")
 
-		outfit_html = []
+		order = ["main", "race", "proto", "stage"]
+		images_by_name = {os.path.splitext(x)[0].lower(): x for x in images}
 
-		for i, image in enumerate(images):
-			outfit = expected[os.path.splitext(image)[0]]
-			wiki_filename = os.path.basename(urlparse(outfit["url"]).path)
+		return outfit_fields, [images_by_name[outfit_name] for outfit_name in order if outfit_name in images_by_name]
 
-			media_name = f"{name.replace(' ', '_')}_{image}"
+	def get_character_teams(self, name, character):
+		character_teams = []
 
-			outfit_html.append(
-				f"""
-		<div class="outfit{"" if i == 0 else " hidden"}">
-			<img src="{media_name}">
-			<a class="outfit-file-link" href="{file_page(wiki_filename)}">Image File</a>
-		</div>
-		"""
+		for team_name in character.get("teams", []):
+			team = self.teams[team_name]
+			role = next(member.get("role") for member in team["members"] if member["name"] == name) or "Member"
+
+			anchor = team_name.replace(" ", "_")
+			if team_name.endswith(" (DLC)"):
+				anchor = anchor.replace("_(DLC)", "(DLC)")
+
+			label = link_wrap(
+				team_name,
+				f"https://umamusu.wiki/Teams_and_Clubs#{anchor}",
 			)
+			character_teams.append(f"{label} ({role})")
+
+		return character_teams
+
+	def add_character(self, name, character):
+		# build attributes
 
 		attrs = []
 
 		def add_attr(label, value):
+			assert value, f"No value for {label = }"
+			attrs.append((label, value))
+
+		def add_opt_attr(label, value):
 			if value:
 				attrs.append((label, value))
 
-		add_attr("Japanese", character.get("japanese"))
+		def add_list_attr(singular, plural, values):
+			if len(values) == 1:
+				add_attr(singular, values[0])
+			elif values:
+				add_attr(
+					plural,
+					f"<ul>{''.join(f'<li>{x}</li>' for x in values)}</ul>",
+				)
 
-		if character.get("nicknames"):
-			add_attr("Nicknames", ", ".join(character["nicknames"]))
+		dorm = character.get("dorm")
+		roommate = character.get("roommate")
+		voice_actor = character.get("seiyuu")
+		irl_page = character.get("irl_page")
 
-		add_attr("Title", character.get("title"))
-
+		# names
+		add_attr("Title", character.get("epithet"))
+		add_attr("Japanese", character.get("name_jp"))
+		add_attr("Traditional Chinese", character.get("name_tcn"))
+		add_opt_attr("Simplified Chinese", character.get("name_scn"))
+		add_opt_attr("Korean", character.get("name_kr"))
+		add_list_attr("Nickname", "Nicknames", character.get("nicknames", []))
+		# profile
 		add_attr("Birthday", character.get("birthday"))
-
 		add_attr("Height", character.get("height"))
+		add_attr("Three Sizes", character.get("threesizes"))
+		add_opt_attr("Shoe Size", character.get("shoesize"))
+		# social
+		add_opt_attr("Class", character.get("class"))
+		add_opt_attr("Dorm", link_wrap(dorm, dorm_page(dorm)))
+		add_opt_attr("Roommate", link_wrap(roommate, wiki_page(roommate)))
+		add_list_attr("Team", "Teams", self.get_character_teams(name, character))
+		add_opt_attr("Calls Self", character.get("calls_self"))
+		add_opt_attr("Calls Trainer", character.get("calls_trainer"))
+		# IRL
+		add_opt_attr("Voice Actor", link_wrap(voice_actor, wiki_page(voice_actor)))
+		add_opt_attr("Hong Kong Jockey Club", character.get("name_hkjc"))
+		add_opt_attr("IRL Page", link_wrap(irl_page.removeprefix("IRL:"), wiki_page(irl_page)))
+		# other
+		add_attr("Game ID", character.get("game_id"))
 
-		if character.get("dorm"):
-			add_attr(
-				"Dorm",
-				link_wrap(
-					character["dorm"],
-					f"https://umamusu.wiki/Roommates/{character['dorm'].replace(' ', '_')}_Dorm",
-				),
+		# build html
+
+		outfit_html = []
+		outfit_fields, images = self.get_images(name, character)
+
+		for i, image in enumerate(images):
+			outfit_name = os.path.splitext(image)[0].lower()
+			wiki_filename = outfit_fields[outfit_name]
+			media_name = f"{name.replace(' ', '_')}_{image}"
+
+			outfit_html.append(
+				f"""
+                <div class="outfit{"" if i == 0 else " hidden"}">
+                    <img src="{media_name}">
+                    <a class="outfit-file-link" href="{file_page(wiki_filename)}">
+                        Image File
+                    </a>
+                </div>
+                """
 			)
 
-		if character.get("roommate"):
-			add_attr(
-				"Roommate",
-				link_wrap(character["roommate"], wiki_page(character["roommate"])),
+		character_type = character.get("type", "unknown")
+		name_html = f"[{character_type}] {
+			link_wrap(
+				name,
+				character.get('url', wiki_page(name)),
 			)
-
-		character_teams = []
-
-		for team in teams:
-			for member in team.get("members", []):
-				if member["name"] == name:
-					role = member.get("role")
-
-					label = team["name"]
-
-					if role:
-						label += f" ({role})"
-
-					character_teams.append(
-						link_wrap(
-							label,
-							f"https://umamusu.wiki/Teams_and_Clubs#{team['name'].replace(' ', '_')}",
-						)
-					)
-
-		if character_teams:
-			add_attr("Teams", ", ".join(character_teams))
-
-		if character.get("voiceActor"):
-			add_attr(
-				"Voice Actor",
-				link_wrap(character["voiceActor"], wiki_page(character["voiceActor"])),
-			)
-
-		if character.get("game_id"):
-			add_attr("Game ID", character.get("game_id"))
+		}"
 
 		attributes = "<table class='infobox'>"
 
 		for key, value in attrs:
 			attributes += f"""
-<tr>
-<td><i>{key}</i></td>
-<td>{value}</td>
-</tr>
-"""
+            <tr>
+                <td>{key}</td>
+                <td>{value}</td>
+            </tr>
+            """
 
 		attributes += "</table>"
 
-		name_html = link_wrap(name, character.get("url", wiki_page(name)))
+		# build note
 
 		note = StableNote(
 			model=model,
