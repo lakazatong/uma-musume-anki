@@ -9,7 +9,9 @@ def link_wrap(text, href):
 
 
 def dorm_page(dorm):
-	return f"https://umamusu.wiki/Roommates/{dorm.replace(' ', '_')}_Dorm"
+	if dorm:
+		return f"https://umamusu.wiki/Roommates/{dorm.replace(' ', '_')}_Dorm"
+	return None
 
 
 def file_page(filename):
@@ -17,4 +19,6 @@ def file_page(filename):
 
 
 def wiki_page(name):
-	return f"https://umamusu.wiki/{quote(name.replace(' ', '_'))}"
+	if name:
+		return f"https://umamusu.wiki/{quote(name.replace(' ', '_'))}"
+	return None

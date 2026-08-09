@@ -157,6 +157,14 @@ html, body {
     margin-bottom: 25px;
 }
 
+.infobox .separator th {
+	padding: 8px 6px 4px;
+	text-align: left;
+	font-size: 0.9em;
+	font-weight: bold;
+	border-bottom: 1px solid #ccc;
+}
+
 table.infobox {
     border-collapse: collapse;
     margin: 0 auto;

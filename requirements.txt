@@ -1,2 +1,4 @@
 genanki
 pillow
+mwparserfromhell
+beautifulsoup4

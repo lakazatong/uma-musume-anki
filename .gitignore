@@ -181,10 +181,11 @@ cython_debug/
 .cursorindexingignore
 
 # Custom
-node_modules/
-outfits/
 .anki_cropped_outfits/
-characters.json
-teams.json
 *.apkg
 onefile_*
+xmls/
+images/
+jsons/
+experiment.py
+playground.py

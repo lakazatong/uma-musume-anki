@@ -81,59 +81,7 @@ class UmaDeck(genanki.Deck):
 		return character_teams
 
 	def add_character(self, name, character):
-		# build attributes
-
-		attrs = []
-
-		def add_attr(label, value):
-			assert value, f"No value for {label = }"
-			attrs.append((label, value))
-
-		def add_opt_attr(label, value):
-			if value:
-				attrs.append((label, value))
-
-		def add_list_attr(singular, plural, values):
-			if len(values) == 1:
-				add_attr(singular, values[0])
-			elif values:
-				add_attr(
-					plural,
-					f"<ul>{''.join(f'<li>{x}</li>' for x in values)}</ul>",
-				)
-
-		dorm = character.get("dorm")
-		roommate = character.get("roommate")
-		voice_actor = character.get("seiyuu")
-		irl_page = character.get("irl_page")
-
-		# names
-		add_attr("Title", character.get("epithet"))
-		add_attr("Japanese", character.get("name_jp"))
-		add_attr("Traditional Chinese", character.get("name_tcn"))
-		add_opt_attr("Simplified Chinese", character.get("name_scn"))
-		add_opt_attr("Korean", character.get("name_kr"))
-		add_list_attr("Nickname", "Nicknames", character.get("nicknames", []))
-		# profile
-		add_attr("Birthday", character.get("birthday"))
-		add_attr("Height", character.get("height"))
-		add_attr("Three Sizes", character.get("threesizes"))
-		add_opt_attr("Shoe Size", character.get("shoesize"))
-		# social
-		add_opt_attr("Class", character.get("class"))
-		add_opt_attr("Dorm", link_wrap(dorm, dorm_page(dorm)))
-		add_opt_attr("Roommate", link_wrap(roommate, wiki_page(roommate)))
-		add_list_attr("Team", "Teams", self.get_character_teams(name, character))
-		add_opt_attr("Calls Self", character.get("calls_self"))
-		add_opt_attr("Calls Trainer", character.get("calls_trainer"))
-		# IRL
-		add_opt_attr("Voice Actor", link_wrap(voice_actor, wiki_page(voice_actor)))
-		add_opt_attr("Hong Kong Jockey Club", character.get("name_hkjc"))
-		add_opt_attr("IRL Page", link_wrap(irl_page.removeprefix("IRL:"), wiki_page(irl_page)))
-		# other
-		add_attr("Game ID", character.get("game_id"))
-
-		# build html
+		# build outfit
 
 		outfit_html = []
 		outfit_fields, images = self.get_images(name, character)
@@ -154,6 +102,9 @@ class UmaDeck(genanki.Deck):
                 """
 			)
 
+		# build name
+
+		# this way of displaying the character_type is temporary
 		character_type = character.get("type", "unknown")
 		name_html = f"[{character_type}] {
 			link_wrap(
@@ -162,15 +113,75 @@ class UmaDeck(genanki.Deck):
 			)
 		}"
 
+		# build attributes
+
 		attributes = "<table class='infobox'>"
 
-		for key, value in attrs:
+		def add_attr(label, value):
+			nonlocal attributes
+			assert value, f"No value for {label = }"
 			attributes += f"""
-            <tr>
-                <td>{key}</td>
-                <td>{value}</td>
-            </tr>
-            """
+				<tr>
+					<td>{label}</td>
+					<td>{value}</td>
+				</tr>
+			"""
+
+		def add_opt_attr(label, value):
+			if value:
+				add_attr(label, value)
+
+		def add_list_attr(singular, plural, values):
+			if len(values) == 1:
+				add_attr(singular, values[0])
+			elif values:
+				add_attr(
+					plural,
+					f"<ul>{''.join(f'<li>{x}</li>' for x in values)}</ul>",
+				)
+
+		def add_separator(label):
+			nonlocal attributes
+			attributes += f"""
+				<tr class="separator">
+					<th colspan="2">{label}</th>
+				</tr>
+			"""
+
+		dorm = character.get("dorm")
+		roommate = character.get("roommate")
+		voice_actor = character.get("seiyuu")
+		irl_page = character.get("irl_page")
+
+		add_separator("Names")
+		add_opt_attr("Title", character.get("epithet"))
+		add_opt_attr("Japanese", character.get("name_jp"))
+		add_opt_attr("Traditional Chinese", character.get("name_tcn"))
+		add_opt_attr("Simplified Chinese", character.get("name_scn"))
+		add_opt_attr("Korean", character.get("name_kr"))
+		add_list_attr("Nickname", "Nicknames", character.get("nicknames", []))
+
+		add_separator("Profile")
+		add_opt_attr("Height", character.get("height"))
+		add_opt_attr("Three Sizes", character.get("threesizes"))
+		add_opt_attr("Shoe Size", character.get("shoesize"))
+
+		add_separator("Social")
+		add_opt_attr("Class", character.get("class"))
+		add_opt_attr("Dorm", link_wrap(dorm, dorm_page(dorm)))
+		add_opt_attr("Roommate", link_wrap(roommate, wiki_page(roommate)))
+		add_list_attr("Team", "Teams", self.get_character_teams(name, character))
+		add_opt_attr("Calls Self", character.get("calls_self"))
+		add_opt_attr("Calls Trainer", character.get("calls_trainer"))
+
+		add_separator("IRL")
+		add_opt_attr("Birthday", character.get("birthday"))
+		add_opt_attr("Voice Actor", link_wrap(voice_actor, wiki_page(voice_actor)))
+		add_opt_attr("Hong Kong Jockey Club", character.get("name_hkjc"))
+		add_opt_attr("IRL Page", link_wrap(irl_page.removeprefix("IRL:") if irl_page else None, wiki_page(irl_page)))
+
+		add_separator("Other")
+		add_opt_attr("Game ID", character.get("game_id"))
 
 		attributes += "</table>"
 
