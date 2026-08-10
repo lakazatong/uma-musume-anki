@@ -4,8 +4,13 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 
 from bs4 import BeautifulSoup
+
+from utils import normalize_filename
+
+USER_AGENT = "UmaMusumeAnkiFetcher/1.0 (https://github.com/lakazatong/uma-musume-anki; lakazatong@outlook.com) Python-urllib/3.12"
 
 
 def get_categorized_characters() -> dict[str, list[str]]:
@@ -18,7 +23,7 @@ def get_categorized_characters() -> dict[str, list[str]]:
 		}
 	)
 
-	req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+	req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 	with urllib.request.urlopen(req) as response:
 		data = json.loads(response.read().decode("utf-8"))
 
@@ -48,11 +53,11 @@ def get_categorized_characters() -> dict[str, list[str]]:
 	return result
 
 
-def fetch_xml(page_title: str) -> str:
-	formatted_name = urllib.parse.quote(page_title.replace(" ", "_"))
-	url = f"https://umamusu.wiki/w/index.php?title=Special:Export&pages={formatted_name}&wpDownload=1&action=submit"
+def fetch_xml_batch(page_titles: list[str]) -> str:
+	params = {"action": "query", "format": "json", "export": "1", "exportnowrap": "1", "titles": "|".join(page_titles)}
+	url = "https://umamusu.wiki/w/api.php?" + urllib.parse.urlencode(params)
 
-	req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+	req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 	with urllib.request.urlopen(req) as response:
 		return response.read().decode("utf-8")
 
@@ -64,20 +69,11 @@ def main():
 	jsons_dir = pathlib.Path("jsons")
 	jsons_dir.mkdir(exist_ok=True)
 
-	existing_characters = set()
-	characters_json = jsons_dir / "characters.json"
-	if characters_json.exists():
-		try:
-			with open(characters_json, encoding="utf-8") as f:
-				existing_characters = set(json.load(f).keys())
-		except (json.JSONDecodeError, OSError):
-			pass
-
 	teams_xml_path = xml_dir / "Teams_and_Clubs.xml"
 	if not teams_xml_path.exists():
 		print("Downloading XML for Teams and Clubs...")
 		try:
-			xml_data = fetch_xml("Teams_and_Clubs")
+			xml_data = fetch_xml_batch(["Teams_and_Clubs"])
 			teams_xml_path.write_text(xml_data, encoding="utf-8")
 		except urllib.error.URLError as e:
 			print(f"Failed to fetch Teams and Clubs: {e}")
@@ -88,25 +84,53 @@ def main():
 	with open(jsons_dir / "categories.json", "w", encoding="utf-8") as f:
 		json.dump(categorized, f, indent=4, ensure_ascii=False)
 
+	titles_to_fetch = []
 	for names in categorized.values():
 		for name in names:
-			if name in existing_characters:
+			safe_filename = normalize_filename(name)
+			if (xml_dir / safe_filename).exists():
 				continue
 
-			safe_filename = name.replace("/", "_") + ".xml"
-			filepath = xml_dir / safe_filename
+			if name not in titles_to_fetch:
+				titles_to_fetch.append(name)
 
-			if filepath.exists():
-				continue
+	batch_size = 50
+	for i in range(0, len(titles_to_fetch), batch_size):
+		batch = titles_to_fetch[i : i + batch_size]
+		print(f"Downloading batch {i // batch_size + 1}/{(len(titles_to_fetch) + batch_size - 1) // batch_size}...")
 
-			print(f"Downloading XML for {name}...")
-			try:
-				xml_data = fetch_xml(name)
-				filepath.write_text(xml_data, encoding="utf-8")
-			except urllib.error.URLError as e:
-				print(f"Failed to fetch {name}: {e}")
+		try:
+			xml_data = fetch_xml_batch(batch)
+			root = ET.fromstring(xml_data)
 
-			time.sleep(1.0)
+			namespace = ""
+			if "}" in root.tag:
+				ns_uri = root.tag.split("}")[0][1:]
+				ET.register_namespace("", ns_uri)
+				namespace = f"{{{ns_uri}}}"
+
+			siteinfo = root.find(f"{namespace}siteinfo")
+
+			for page in root.findall(f"{namespace}page"):
+				title_elem = page.find(f"{namespace}title")
+				if title_elem is not None and title_elem.text:
+					safe_filename = normalize_filename(title_elem.text)
+					filepath = xml_dir / safe_filename
+
+					new_root = ET.Element(root.tag, root.attrib)
+					if siteinfo is not None:
+						new_root.append(siteinfo)
+					new_root.append(page)
+
+					tree = ET.ElementTree(new_root)
+					tree.write(filepath, encoding="utf-8", xml_declaration=True)
+
+		except urllib.error.URLError as e:
+			print(f"Failed to fetch batch {i // batch_size + 1}: {e}")
+		except ET.ParseError as e:
+			print(f"Failed to parse XML for batch {i // batch_size + 1}: {e}")
+
+		time.sleep(1.0)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ from typing import Any
 
 import mwparserfromhell
 
+from utils import normalize_filename
+
 
 def parse_character_templates(xml_data: str) -> dict:
 	root = ET.fromstring(xml_data)
@@ -59,7 +61,8 @@ def parse_teams_and_clubs(filepath: pathlib.Path) -> tuple[dict[str, dict[str, A
 	ns = root.tag.split("}")[0] + "}" if root.tag.startswith("{") else ""
 
 	text_elem = root.find(f".//{ns}text")
-	assert text_elem is not None and isinstance(text_elem.text, str)
+	if text_elem is None or not isinstance(text_elem.text, str):
+		return {}, {}
 
 	wikitext = text_elem.text
 
@@ -245,7 +248,7 @@ def transform_character_data(
 		for template_params in raw_templates[template_name]:
 			for key, val in template_params.items():
 				if not isinstance(val, str):
-					raise RuntimeWarning("Not a string value found", val)
+					continue
 
 				val = val.strip()
 				if not val:
@@ -261,7 +264,6 @@ def transform_character_data(
 					character_data[key] = parse_call_entry(val)
 					continue
 
-				# various edge cases (could be reported to the wiki tbh)
 				if key == "class" and val == 'Unknown (listed as "???" in-game)':
 					val = "Unknown"
 				elif key == "dorm" and val.lower() == "lives alone":
@@ -269,7 +271,6 @@ def transform_character_data(
 				elif key == "type":
 					val = val.lower()
 
-				# categorical attributes, they are better off in their own table
 				if key in ("type", "dorm", "class"):
 					categorical_maps[key].setdefault(val, [])
 					if char_name not in categorical_maps[key][val]:
@@ -382,11 +383,11 @@ def main():
 
 	for names in categorized.values():
 		for name in names:
-			safe_filename = name.replace("/", "_") + ".xml"
+			safe_filename = normalize_filename(name)
 			filepath = xml_dir / safe_filename
 
 			if not filepath.exists():
-				print(f"Warning: XML file for {name} missing, skipping...")
+				print(f"Warning: XML file for {name} missing ({safe_filename}), skipping...")
 				continue
 
 			try:

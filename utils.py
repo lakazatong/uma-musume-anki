@@ -2,6 +2,10 @@ import html
 from urllib.parse import quote
 
 
+def normalize_filename(title: str) -> str:
+	return title.replace(" ", "_").replace("/", "_") + ".xml"
+
+
 def link_wrap(text, href):
 	if text and href:
 		return f'<a href="{html.escape(href, quote=True)}">{html.escape(text)}</a>'
