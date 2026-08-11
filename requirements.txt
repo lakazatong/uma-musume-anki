@@ -2,3 +2,4 @@ genanki
 pillow
 mwparserfromhell
 beautifulsoup4
+requests

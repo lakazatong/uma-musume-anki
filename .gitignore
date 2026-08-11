@@ -184,8 +184,8 @@ cython_debug/
 .anki_cropped_outfits/
 *.apkg
 onefile_*
-xmls/
+parsed/
+raw/
 images/
-jsons/
 experiment.py
 playground.py

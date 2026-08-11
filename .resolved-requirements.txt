@@ -4,19 +4,29 @@ beautifulsoup4==4.15.0
     # via -r ./requirements.txt
 cached-property==2.0.1
     # via genanki
+certifi==2026.7.22
+    # via requests
+charset-normalizer==3.4.9
+    # via requests
 chevron==0.14.0
     # via genanki
 frozendict==2.4.7
     # via genanki
 genanki==0.13.1
     # via -r ./requirements.txt
+idna==3.18
+    # via requests
 mwparserfromhell==0.7.2
     # via -r ./requirements.txt
 pillow==12.3.0
     # via -r ./requirements.txt
 pyyaml==6.0.3
     # via genanki
+requests==2.34.2
+    # via -r ./requirements.txt
 soupsieve==2.9.2
     # via beautifulsoup4
 typing-extensions==4.16.0
     # via beautifulsoup4
+urllib3==2.7.0
+    # via requests

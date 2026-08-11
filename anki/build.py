@@ -5,7 +5,7 @@ import shutil
 import genanki
 from PIL import Image
 
-from anki_deck import UmaDeck
+from anki.deck import UmaDeck
 
 
 def crop_transparent(src, dst):

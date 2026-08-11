@@ -4,8 +4,9 @@ from typing import cast
 
 import genanki
 
-from anki_model import model
-from utils import dorm_page, file_page, link_wrap, wiki_page
+from anki.model import model
+from common.config import BASE_WIKI_URL
+from common.utils import dorm_page, file_page, link_wrap, wiki_page
 
 
 class StableNote(genanki.Note):
@@ -74,7 +75,7 @@ class UmaDeck(genanki.Deck):
 
 			label = link_wrap(
 				team_name,
-				f"https://umamusu.wiki/Teams_and_Clubs#{anchor}",
+				f"{BASE_WIKI_URL}/Teams_and_Clubs#{anchor}",
 			)
 			character_teams.append(f"{label} ({role})")
 
